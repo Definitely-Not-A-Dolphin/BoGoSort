@@ -77,7 +77,7 @@ fn main() {
       );
       print!(
         "Took \x1b[41m{}ms\x1b[0m\n\n",
-        starting_time.elapsed().as_millis()
+        starting_time.elapsed().as_micros();
       );
     }
   } else if arg1.starts_with("-p=") {
