@@ -76,8 +76,8 @@ fn main() {
         n, required_iterations
       );
       print!(
-        "Took \x1b[41m{}ms\x1b[0m\n\n",
-        starting_time.elapsed().as_micros();
+        "Took \x1b[41m{}μs\x1b[0m\n\n",
+        starting_time.elapsed().as_micros()
       );
     }
   } else if arg1.starts_with("-p=") {
@@ -96,8 +96,8 @@ fn main() {
       print!("Tries to sort {}: \x1b[44m{}\x1b[0m,\n", i, required_tries);
       print!("      while {}! = \x1b[42m{}\x1b[0m\n", i, factorial(i));
       print!(
-        "Took \x1b[41m{}ms\x1b[0m\n\n",
-        starting_time.elapsed().as_millis()
+        "Took \x1b[41m{}μs\x1b[0m\n\n",
+        starting_time.elapsed().as_micros()
       );
     }
   }
