@@ -5,3 +5,12 @@ version = 4
 [[package]]
 name = "BoGoSort"
 version = "0.1.0"
+dependencies = [
+ "sap",
+]
+
+[[package]]
+name = "sap"
+version = "0.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0396d175c482d7af9c821d7895255cbdbbde2a04f55c9f4bcbff66aed4f06811"

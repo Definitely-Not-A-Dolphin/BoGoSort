@@ -1,15 +1,22 @@
-use std::env;
+use sap::{Argument, Parser};
 use std::time::Instant;
 
-fn factorial(n: i32) -> i64 {
-  let mut prod: i64 = 1;
+struct Args {
+  p: f64,
+  n: u64,
+  l_start: u32,
+  l_end: u32,
+}
+
+fn factorial(n: u32) -> u64 {
+  let mut prod = 1u64;
   for i in 1..=n {
-    prod *= i as i64;
+    prod *= i as u64;
   }
   prod
 }
 
-fn inv_factorial(n: i32) -> f64 {
+fn inv_factorial(n: u32) -> f64 {
   let mut prod = 1f64;
   for i in 1..=n {
     prod /= i as f64;
@@ -17,17 +24,17 @@ fn inv_factorial(n: i32) -> f64 {
   prod
 }
 
-fn prob_sorted_at(prob_sorted: f64, tries: i64) -> f64 {
+fn prob_sorted_at(prob_sorted: f64, tries: u64) -> f64 {
   (1f64 - prob_sorted).powf(tries as f64 - 1f64) * prob_sorted
 }
 
-fn tries_required_exceed_prob(prob_sorted: f64, prob: f64) -> i64 {
+fn tries_required_exceed_prob(prob_sorted: f64, prob: f64) -> u64 {
   let mut sum = 0f64;
-  let mut i = 1i64;
+  let mut i = 1u64;
   loop {
     let prob_sorted_at_i = prob_sorted_at(prob_sorted, i);
     if prob_sorted_at_i == 0f64 {
-      return -1i64;
+      return 0u64;
     }
     sum += prob_sorted_at_i;
     if sum >= prob {
@@ -37,7 +44,7 @@ fn tries_required_exceed_prob(prob_sorted: f64, prob: f64) -> i64 {
   }
 }
 
-fn prob_sorted_after_n_iterations(array_length: i32, iterations: i64) -> f64 {
+fn prob_sorted_after_n_iterations(array_length: u32, iterations: u64) -> f64 {
   let mut acc_prob = 0f64;
   let prob_sorted = inv_factorial(array_length);
   for k in 1..=iterations {
@@ -54,47 +61,92 @@ fn prob_sorted_after_n_iterations(array_length: i32, iterations: i64) -> f64 {
 }
 
 fn main() {
-  let args: Vec<String> = env::args().collect();
-  let arg1 = &args[1];
+  let mut parser = Parser::from_env().unwrap();
+  let mut args = Args {
+    p: -1f64,
+    n: 0u64,
+    l_start: 1,
+    l_end: 1,
+  };
 
-  if arg1.starts_with("-n=") {
+  while let Some(arg) = parser.forward().unwrap() {
+    match arg {
+      Argument::Long("p") => {
+        if let Some(p) = parser.value() {
+          args.p = match p.parse::<f64>() {
+            Ok(p) => p,
+            Err(e) => panic!("Invalid argument for p: {}", e),
+          };
+        }
+      }
+      Argument::Long("n") => {
+        if let Some(n) = parser.value() {
+          args.n = match n.parse::<u64>() {
+            Ok(n) => n,
+            Err(e) => panic!("Invalid argument for p: {}", e),
+          };
+        }
+      }
+      Argument::Long("l-start") => {
+        if let Some(l) = parser.value() {
+          args.l_start = match l.parse::<u32>() {
+            Ok(l) => l,
+            Err(e) => panic!("Invalid argument for p: {}", e),
+          };
+        }
+      }
+      Argument::Long("l-end") => {
+        if let Some(l) = parser.value() {
+          args.l_end = l.parse::<u32>().unwrap();
+        }
+      }
+      _ => {}
+    }
+  }
+
+  if !(args.n == 0 || args.p == -1f64) {
+    panic!("Use either n or p, not both!");
+  };
+
+  if args.l_start > args.l_end {
+    panic!("Invalid range: start value is greater than ending value");
+  }
+
+  let l_range = if args.l_end == 1 {
+    args.l_start..=216
+  } else {
+    args.l_start..=args.l_end
+  };
+
+  if args.n != 0 {
     // this means we want to calculate n -> p
-    let n = match arg1.clone().split_off(3).parse::<i64>() {
-      Ok(n) => n,
-      Err(error) => panic!("Invald argument given! {}", error),
-    };
-
-    for i in 1.. {
+    for i in l_range {
       let starting_time = Instant::now();
-      let required_iterations = prob_sorted_after_n_iterations(i, n);
+      let required_iterations = prob_sorted_after_n_iterations(i, args.n);
       if required_iterations == -1f64 {
         panic!("0 reached; Infinite loop entered");
       };
       print!("Array length: {}\n", i);
       print!(
         "Prob sorted after {} iterations: {}\n",
-        n, required_iterations
+        args.n, required_iterations
       );
       print!(
         "Took \x1b[41m{}μs\x1b[0m\n\n",
         starting_time.elapsed().as_micros()
       );
     }
-  } else if arg1.starts_with("-p=") {
+  } else if args.p != 0f64 {
     // this means we want to calculate p -> n
-    let p = match arg1.clone().split_off(3).parse::<f64>() {
-      Ok(p) => p,
-      Err(error) => panic!("Invald argument given! {}", error),
-    };
-
-    for i in 1.. {
+    for l in l_range {
       let starting_time = Instant::now();
-      let required_tries = tries_required_exceed_prob(inv_factorial(i), p);
-      if required_tries == -1i64 {
+      let required_tries = tries_required_exceed_prob(inv_factorial(l), args.p);
+      if required_tries == 0u64 {
         panic!("0 reached; Infinite loop entered");
       }
-      print!("Tries to sort {}: \x1b[44m{}\x1b[0m,\n", i, required_tries);
-      print!("      while {}! = \x1b[42m{}\x1b[0m\n", i, factorial(i));
+      print!("Array length: {}\n", l);
+      print!("Tries to sort: \x1b[44m{}\x1b[0m,\n", required_tries);
+      print!("    while {}! = \x1b[42m{}\x1b[0m\n", l, factorial(l));
       print!(
         "Took \x1b[41m{}μs\x1b[0m\n\n",
         starting_time.elapsed().as_micros()
