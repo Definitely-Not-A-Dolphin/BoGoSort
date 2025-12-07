@@ -9,6 +9,9 @@ struct Args {
 }
 
 fn factorial(n: u32) -> u64 {
+  if n == 0 {
+    return 1;
+  };
   let mut prod = 1u64;
   for i in 1..=n {
     prod *= i as u64;
@@ -17,6 +20,9 @@ fn factorial(n: u32) -> u64 {
 }
 
 fn inv_factorial(n: u32) -> f64 {
+  if n == 0 {
+    return 1f64;
+  }
   let mut prod = 1f64;
   for i in 1..=n {
     prod /= i as f64;
@@ -64,7 +70,7 @@ fn main() {
   let mut parser = Parser::from_env().unwrap();
   let mut args = Args {
     p: -1f64,
-    n: 0u64,
+    n: 0,
     l_start: 1,
     l_end: 1,
   };
@@ -141,7 +147,7 @@ fn main() {
     for l in l_range {
       let starting_time = Instant::now();
       let required_tries = tries_required_exceed_prob(inv_factorial(l), args.p);
-      if required_tries == 0u64 {
+      if required_tries == 0 {
         panic!("0 reached; Infinite loop entered");
       }
       print!("Array length: {}\n", l);
