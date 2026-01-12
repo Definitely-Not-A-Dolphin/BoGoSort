@@ -1,8 +1,8 @@
 use sap::{Argument, Parser};
-use std::sync::mpsc;
-use std::{thread, time::Instant};
+use std::{sync::mpsc, thread, time::Instant};
 
 struct Args {
+    threads: u8,
     p: f64,
     n: u64,
     l_start: u32,
@@ -21,10 +21,10 @@ fn prob_sorted_at(prob_sorted: f64, tries: u64) -> f64 {
     (1f64 - prob_sorted).powf((tries - 1) as f64) * prob_sorted
 }
 
-fn tries_required_exceed_prob(prob_sorted: f64, prob: f64) -> u64 {
+fn tries_required_exceed_prob(array_length: u32, prob: f64) -> u64 {
     let mut sum = 0f64;
     for i in 1.. {
-        let prob_sorted_at_i = prob_sorted_at(prob_sorted, i);
+        let prob_sorted_at_i = prob_sorted_at(inv_factorial(array_length), i);
         if prob_sorted_at_i == 0f64 {
             return 0u64;
         }
@@ -37,41 +37,56 @@ fn tries_required_exceed_prob(prob_sorted: f64, prob: f64) -> u64 {
     0 // this will never return but otherwise rust wil complain
 }
 
-fn prob_sorted_after_n_iterations(array_length: u32, iterations: u64) -> f64 {
+fn prob_sorted_after_n_iterations(threads: u8, array_length: u32, iterations: u64) -> f64 {
     let prob_sorted = inv_factorial(array_length);
     let (tx, rx) = mpsc::channel();
+    let mut handles = vec![];
 
-    let handle = thread::spawn(move || {
-        let mut acc_prob_new = 0f64;
-        for k in (2..=iterations).step_by(2) {
-            acc_prob_new += prob_sorted_at(prob_sorted, k);
-        }
-        tx.send(acc_prob_new).unwrap();
-    });
+    for i in 2..=threads {
+        let txi = tx.clone();
+        handles.push(thread::spawn(move || {
+            let mut acc_prob = 0f64;
+            for k in ((i as u64)..=iterations).step_by(threads as usize) {
+                acc_prob += prob_sorted_at(prob_sorted, k);
+            }
+            txi.send(acc_prob).unwrap();
+        }));
+    }
 
     let mut acc_prob = 0f64;
-    for k in (1..iterations).step_by(2) {
+    for k in (1..=iterations).step_by(threads as usize) {
         acc_prob += prob_sorted_at(prob_sorted, k);
     }
 
-    handle.join().unwrap();
+    for handle in handles {
+        handle.join().unwrap();
+    }
 
-    let received = rx.recv().unwrap();
+    drop(tx);
 
-    acc_prob + received
+    acc_prob + rx.iter().sum::<f64>()
 }
 
 fn main() {
     let mut parser = Parser::from_env().unwrap();
     let mut args = Args {
+        threads: 1,
         p: -1f64,
         n: 0,
         l_start: 1,
-        l_end: 1,
+        l_end: 0,
     };
 
     while let Some(arg) = parser.forward().unwrap() {
         match arg {
+            Argument::Long("threads") => {
+                if let Some(threads) = parser.value() {
+                    args.threads = match threads.parse::<u8>() {
+                        Ok(threads) => threads,
+                        Err(e) => panic!("Invalid argument for threads: {}", e),
+                    };
+                }
+            }
             Argument::Long("p") => {
                 if let Some(p) = parser.value() {
                     args.p = match p.parse::<f64>() {
@@ -113,7 +128,7 @@ fn main() {
         panic!("Invalid range: start value is greater than ending value");
     }
 
-    let l_range = if args.l_end == 1 {
+    let l_range = if args.l_end == 0 {
         args.l_start..=216
     } else {
         args.l_start..=args.l_end
@@ -123,17 +138,14 @@ fn main() {
         // this means we want to calculate n -> p
         for i in l_range {
             let starting_time = Instant::now();
-            let required_iterations = prob_sorted_after_n_iterations(i, args.n);
-            if required_iterations == -1f64 {
-                panic!("0 reached; Infinite loop entered");
-            };
             println!("Array length: {}", i);
             println!(
                 "Prob sorted after {} iterations: {}",
-                args.n, required_iterations
+                args.n,
+                prob_sorted_after_n_iterations(args.threads, i, args.n)
             );
-            print!(
-                "Took \x1b[41m{}μs\x1b[0m\n\n",
+            println!(
+                "Took \x1b[41m{}μs\x1b[0m\n",
                 starting_time.elapsed().as_micros()
             );
         }
@@ -141,12 +153,12 @@ fn main() {
         // this means we want to calculate p -> n
         for l in l_range {
             let starting_time = Instant::now();
-            let required_tries = tries_required_exceed_prob(inv_factorial(l), args.p);
+            let required_tries = tries_required_exceed_prob(l, args.p);
             println!("Array length: {}", l);
             println!("Tries to sort: \x1b[44m{}\x1b[0m,", required_tries);
             println!("    while {}! = \x1b[42m{}\x1b[0m", l, factorial(l));
-            print!(
-                "Took \x1b[41m{}μs\x1b[0m\n\n",
+            println!(
+                "Took \x1b[41m{}μs\x1b[0m\n",
                 starting_time.elapsed().as_micros()
             );
         }
