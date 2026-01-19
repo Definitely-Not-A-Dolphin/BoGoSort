@@ -1,8 +1,7 @@
 use sap::{Argument, Parser};
-use std::{sync::mpsc, thread, time::Instant};
+use std::time::Instant;
 
 struct Args {
-    threads: u8,
     p: f64,
     n: u64,
     l_start: u32,
@@ -17,60 +16,17 @@ fn inv_factorial(n: u32) -> f64 {
     1f64 / (factorial(n) as f64)
 }
 
-fn prob_sorted_at(prob_sorted: f64, tries: u64) -> f64 {
-    (1f64 - prob_sorted).powf((tries - 1) as f64) * prob_sorted
-}
-
 fn tries_required_exceed_prob(array_length: u32, prob: f64) -> u64 {
-    let mut sum = 0f64;
-    for i in 1.. {
-        let prob_sorted_at_i = prob_sorted_at(inv_factorial(array_length), i);
-        if prob_sorted_at_i == 0f64 {
-            return 0u64;
-        }
-        sum += prob_sorted_at_i;
-        if sum >= prob {
-            return i;
-        };
-    }
-
-    0 // this will never return but otherwise rust wil complain
+    ((1f64 - prob).ln() / (1f64 - inv_factorial(array_length)).ln()).ceil() as u64
 }
 
-fn prob_sorted_after_n_iterations(threads: u8, array_length: u32, iterations: u64) -> f64 {
-    let prob_sorted = inv_factorial(array_length);
-    let (tx, rx) = mpsc::channel();
-    let mut handles = vec![];
-
-    for i in 2..=threads {
-        let txi = tx.clone();
-        handles.push(thread::spawn(move || {
-            let mut acc_prob = 0f64;
-            for k in ((i as u64)..=iterations).step_by(threads as usize) {
-                acc_prob += prob_sorted_at(prob_sorted, k);
-            }
-            txi.send(acc_prob).unwrap();
-        }));
-    }
-
-    let mut acc_prob = 0f64;
-    for k in (1..=iterations).step_by(threads as usize) {
-        acc_prob += prob_sorted_at(prob_sorted, k);
-    }
-
-    for handle in handles {
-        handle.join().unwrap();
-    }
-
-    drop(tx);
-
-    acc_prob + rx.iter().sum::<f64>()
+fn prob_sorted_after_n_iterations(array_length: u32, iterations: u64) -> f64 {
+    1f64 - (1f64 - inv_factorial(array_length)).powi(iterations as i32)
 }
 
 fn main() {
     let mut parser = Parser::from_env().unwrap();
     let mut args = Args {
-        threads: 1,
         p: -1f64,
         n: 0,
         l_start: 1,
@@ -79,14 +35,6 @@ fn main() {
 
     while let Some(arg) = parser.forward().unwrap() {
         match arg {
-            Argument::Long("threads") => {
-                if let Some(threads) = parser.value() {
-                    args.threads = match threads.parse::<u8>() {
-                        Ok(threads) => threads,
-                        Err(e) => panic!("Invalid argument for threads: {}", e),
-                    };
-                }
-            }
             Argument::Long("p") => {
                 if let Some(p) = parser.value() {
                     args.p = match p.parse::<f64>() {
@@ -124,25 +72,25 @@ fn main() {
         panic!("Use either n or p, not both!");
     };
 
+    if args.l_end == 0 {
+        args.l_end = 216;
+    };
+
     if args.l_start > args.l_end {
         panic!("Invalid range: start value is greater than ending value");
     }
 
-    let l_range = if args.l_end == 0 {
-        args.l_start..=216
-    } else {
-        args.l_start..=args.l_end
-    };
+    let l_range = args.l_start..=args.l_end;
 
     if args.n != 0 {
         // this means we want to calculate n -> p
-        for i in l_range {
+        for l in l_range {
             let starting_time = Instant::now();
-            println!("Array length: {}", i);
+            println!("Array length: {}", l);
             println!(
                 "Prob sorted after {} iterations: {}",
                 args.n,
-                prob_sorted_after_n_iterations(args.threads, i, args.n)
+                prob_sorted_after_n_iterations(l, args.n)
             );
             println!(
                 "Took \x1b[41m{}μs\x1b[0m\n",
